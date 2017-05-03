@@ -18,11 +18,10 @@ import_path = os.path.abspath(os.path.join(current_path, "../.."))
 if import_path not in sys.path:
   sys.path.append(import_path)
 
-from lib.atari import helpers as atari_helpers
 from estimators import ValueEstimator, PolicyEstimator
 from policy_monitor import PolicyMonitor
 from worker import Worker
-
+import env_helpers
 
 tf.flags.DEFINE_string("model_dir", "/tmp/a3c", "Directory to write Tensorboard summaries and videos to.")
 tf.flags.DEFINE_string("env", "Breakout-v0", "Name of gym Atari environment, e.g. Breakout-v0")
@@ -34,18 +33,13 @@ tf.flags.DEFINE_integer("parallelism", None, "Number of threads to run. If not s
 
 FLAGS = tf.flags.FLAGS
 
-def make_env(wrap=True):
-  env = gym.envs.make(FLAGS.env)
-  # remove the timelimitwrapper
-  env = env.env
-  if wrap:
-    env = atari_helpers.AtariEnvWrapper(env)
-  return env
 
 # Depending on the game we may have a limited action space
-env_ = make_env()
+env_ = env_helpers.make_env(FLAGS.env)
 if FLAGS.env == "Pong-v0" or FLAGS.env == "Breakout-v0":
   VALID_ACTIONS = list(range(4))
+elif FLAGS.env == "CarRacing-v0":
+  VALID_ACTIONS = list(range(25))
 else:
   VALID_ACTIONS = list(range(env_.action_space.n))
 env_.close()
@@ -93,7 +87,7 @@ with tf.device("/cpu:0"):
 
     worker = Worker(
       name="worker_{}".format(worker_id),
-      env=make_env(),
+      env_name=FLAGS.env,
       policy_net=policy_net,
       value_net=value_net,
       global_counter=global_counter,
@@ -107,7 +101,7 @@ with tf.device("/cpu:0"):
   # Used to occasionally save videos for our policy net
   # and write episode rewards to Tensorboard
   pe = PolicyMonitor(
-    env=make_env(wrap=False),
+    env_name=FLAGS.env,
     policy_net=policy_net,
     summary_writer=summary_writer,
     saver=saver)

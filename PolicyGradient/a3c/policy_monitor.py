@@ -20,7 +20,7 @@ from lib.atari.state_processor import StateProcessor
 from lib.atari import helpers as atari_helpers
 from estimators import ValueEstimator, PolicyEstimator
 from worker import make_copy_params_op
-
+import env_helpers
 
 class PolicyMonitor(object):
   """
@@ -32,12 +32,13 @@ class PolicyMonitor(object):
     policy_net: A policy estimator
     summary_writer: a tf.train.SummaryWriter used to write Tensorboard summaries
   """
-  def __init__(self, env, policy_net, summary_writer, saver=None):
+  def __init__(self, env_name, policy_net, summary_writer, saver=None):
 
     self.video_dir = os.path.join(summary_writer.get_logdir(), "../videos")
     self.video_dir = os.path.abspath(self.video_dir)
 
-    self.env = Monitor(env, directory=self.video_dir, video_callable=lambda x: True, resume=True)
+    self.env_name = env_name
+    self.env = None
     self.global_policy_net = policy_net
     self.summary_writer = summary_writer
     self.saver = saver
@@ -101,6 +102,11 @@ class PolicyMonitor(object):
     """
     Continuously evaluates the policy every [eval_every] seconds.
     """
+    if self.env is None:
+      self.env = env_helpers.make_env(self.env_name, wrap=False)
+      print("env:", self.env)
+      self.env = Monitor(self.env, directory=self.video_dir, video_callable=lambda x: True, resume=True)
+
     try:
       while not coord.should_stop():
         self.eval_once(sess)

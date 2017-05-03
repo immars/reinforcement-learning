@@ -5,7 +5,6 @@ import itertools
 import collections
 import numpy as np
 import tensorflow as tf
-
 from inspect import getsourcefile
 current_path = os.path.dirname(os.path.abspath(getsourcefile(lambda:0)))
 import_path = os.path.abspath(os.path.join(current_path, "../.."))
@@ -17,6 +16,7 @@ if import_path not in sys.path:
 from lib.atari.state_processor import StateProcessor
 from lib.atari import helpers as atari_helpers
 from estimators import ValueEstimator, PolicyEstimator
+import env_helpers
 
 Transition = collections.namedtuple("Transition", ["state", "action", "reward", "next_state", "done"])
 
@@ -64,7 +64,7 @@ class Worker(object):
     summary_writer: A tf.train.SummaryWriter for Tensorboard summaries
     max_global_steps: If set, stop coordinator when global_counter > max_global_steps
   """
-  def __init__(self, name, env, policy_net, value_net, global_counter, discount_factor=0.99, summary_writer=None, max_global_steps=None):
+  def __init__(self, name, env_name, policy_net, value_net, global_counter, discount_factor=0.99, summary_writer=None, max_global_steps=None):
     self.name = name
     self.discount_factor = discount_factor
     self.max_global_steps = max_global_steps
@@ -75,7 +75,8 @@ class Worker(object):
     self.local_counter = itertools.count()
     self.sp = StateProcessor()
     self.summary_writer = summary_writer
-    self.env = env
+    self.env_name = env_name
+    self.env = None
 
     # Create local policy/value nets that are not updated asynchronously
     with tf.variable_scope(name):
@@ -93,6 +94,8 @@ class Worker(object):
     self.state = None
 
   def run(self, sess, coord, t_max):
+    if self.env is None:
+      self.env = env_helpers.make_env(self.env_name)
     with sess.as_default(), sess.graph.as_default():
       # Initial state
       self.state = atari_helpers.atari_make_initial_state(self.sp.process(self.env.reset()))
